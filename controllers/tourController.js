@@ -1,6 +1,16 @@
 const Tour = require('../models/tourModel');
 
 // ROUTE HANDLERS
+exports.aliasTopTours = (req, res, next) => {
+  try {
+    req.query.limit = '5';
+    req.query.sort = '-ratingsAverage,price';
+    req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
+    next();
+  } catch (err) {
+    console.log(err);
+  }
+};
 
 exports.getAllTours = async (req, res) => {
   try {
@@ -32,7 +42,35 @@ exports.getAllTours = async (req, res) => {
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
 
-    const query = Tour.find(JSON.parse(queryStr)); //JSON.parse returns a JS object from a JSON string
+    let query = Tour.find(JSON.parse(queryStr)); //JSON.parse returns a JS object from a JSON string
+
+    // 2) Sorting
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      // default sorting: show newly created first
+      query = query.sort('-createdAt');
+    }
+
+    // 3) Field limiting
+    if (req.query.fields) {
+      const fields = req.query.fields.split(',').join(' ');
+      query = query.select(fields);
+    } else {
+      query = query.select('-__v'); // __v is a field used by Mongoose that we don't need to send to the client, so we can exclude it
+    }
+
+    // 4) Pagination
+    const page = req.query.page * 1 || 1;
+    const limit = req.query.limit * 1 || 100;
+    const skip = (page - 1) * limit;
+    query = query.skip(skip).limit(limit);
+
+    if (req.query.page) {
+      const numTours = await Tour.countDocuments();
+      if (skip > numTours) throw new Error('This page does not exist.');
+    }
 
     // EXECUTE QUERY
     const tours = await query;
