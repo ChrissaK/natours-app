@@ -4,7 +4,8 @@
   "description": "This repo contains starter files and the finished project files for all the projects contained in the course (complete repo size is **288MB**).",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon server.js"
+    "start": "nodemon server.js",
+    "debug": "ndb server.js"
   },
   "author": "Chrissa",
   "license": "ISC",
