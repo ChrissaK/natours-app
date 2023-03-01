@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
@@ -45,6 +46,12 @@ const userSchema = new mongoose.Schema({
   passwordChangedAt: {
     type: Date,
   },
+  passwordResetToken: {
+    type: String,
+  },
+  passwordResetExpires: {
+    type: Date,
+  },
 });
 
 userSchema.pre('save', async function (next) {
@@ -57,6 +64,14 @@ userSchema.pre('save', async function (next) {
   // passwordConfirm is only needed for validating the password, it doesn't need to be saved in the database
   this.passwordConfirm = undefined;
 
+  next();
+});
+
+userSchema.pre('save', function (next) {
+  // Only run this function if password was actually modified
+  if (!this.isModified('password') || this.isNew) return next();
+
+  this.passwordChangedAt = Date.now() - 1000;
   next();
 });
 
@@ -77,6 +92,21 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     return JWTTimestamp < changedTimestamp;
   }
   return false;
+};
+
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  console.log({ resetToken }, this.passwordResetToken);
+
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10mins from now
+
+  return resetToken;
 };
 
 const User = mongoose.model('User', userSchema);
